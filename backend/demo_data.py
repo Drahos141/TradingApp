@@ -56,7 +56,7 @@ def generate_ohlcv(
     open_   = low + (high - low) * rng.uniform(0, 1, n)
     volume  = rng.lognormal(mean=15, sigma=0.5, size=n)
 
-    idx = pd.date_range(end=pd.Timestamp.utcnow(), periods=n, freq=freq)
+    idx = pd.date_range(end=pd.Timestamp.now("UTC"), periods=n, freq=freq)
     return pd.DataFrame(
         {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
         index=idx,

@@ -86,16 +86,30 @@ def get_current_price(symbol: str) -> Optional[dict]:
     try:
         t = yf.Ticker(ticker)
         info = t.fast_info
-        price = float(info.last_price) if info.last_price else None
-        prev  = float(info.previous_close) if info.previous_close else None
+
+        # fast_info properties can raise internal errors (e.g. KeyError from
+        # yfinance when market metadata is missing).  Access each one safely.
+        try:
+            price = float(info.last_price) if info.last_price else None
+        except Exception:  # noqa: BLE001
+            price = None
+
+        try:
+            prev = float(info.previous_close) if info.previous_close else None
+        except Exception:  # noqa: BLE001
+            prev = None
+
+        if price is None:
+            return None
+
         change_pct = ((price - prev) / prev * 100) if price and prev else 0.0
         return {
             "symbol": symbol,
             "ticker": ticker,
-            "price": round(price, 4) if price else None,
+            "price": round(price, 4),
             "prev_close": round(prev, 4) if prev else None,
             "change_pct": round(change_pct, 2),
         }
     except Exception as exc:  # noqa: BLE001
-        logger.exception("Error getting price for %s: %s", symbol, exc)
+        logger.warning("Could not fetch price for %s: %s", symbol, exc)
         return None
