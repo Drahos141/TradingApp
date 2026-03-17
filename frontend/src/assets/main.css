@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Global dark theme ---- */
+body {
+  @apply bg-surface text-gray-100;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { @apply bg-surface; }
+::-webkit-scrollbar-thumb { @apply bg-border rounded; }
+
+/* ---- Card base ---- */
+.card {
+  @apply bg-card border border-border rounded-xl shadow-xl overflow-hidden;
+}
+
+/* ---- Signal colours ---- */
+.signal-buy     { @apply text-buy; }
+.signal-sell    { @apply text-sell; }
+.signal-neutral { @apply text-neutral; }
+
+.bg-signal-buy     { @apply bg-buy; }
+.bg-signal-sell    { @apply bg-sell; }
+.bg-signal-neutral { @apply bg-neutral; }
+
+/* ---- Drag handle ---- */
+.drag-handle {
+  cursor: grab;
+}
+.drag-handle:active { cursor: grabbing; }
+
+/* ---- Pulse animation for live dot ---- */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.live-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  @apply bg-green-400;
+  animation: pulse-ring 1.5s ease-out infinite;
+}
