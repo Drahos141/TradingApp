@@ -78,9 +78,12 @@ def list_assets():
 
 @app.get("/api/price/{symbol}")
 def price(symbol: str):
-    info = get_current_price(symbol.upper())
+    sym = symbol.upper()
+    info = get_current_price(sym)
     if info is None:
-        raise HTTPException(status_code=404, detail=f"Price not available for {symbol}")
+        # Live price unavailable – fall back to demo data so the endpoint
+        # always returns a usable response rather than a 404.
+        info = generate_price_info(sym)
     return info
 
 
