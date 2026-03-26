@@ -280,8 +280,8 @@ function submitPosition() {
     amount:     form.value.amount,
     entryPrice: form.value.entryPrice,
   })
-  // Also store the entry price as a known live price
-  store.livePrices[form.value.symbol] = form.value.entryPrice
+  // Also store the entry price as a known live price via store action
+  store.updateLivePrice(form.value.symbol, form.value.entryPrice)
   form.value.amount = 100
 }
 

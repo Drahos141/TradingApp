@@ -127,6 +127,10 @@ export const useMarketStore = defineStore('market', {
       await Promise.all(symbols.map((s) => this.fetchLivePrice(s)))
     },
 
+    updateLivePrice(symbol, price) {
+      this.livePrices[symbol] = price
+    },
+
     // ---- Paper trading positions ----
     openPosition({ symbol, direction, amount, entryPrice }) {
       const position = {

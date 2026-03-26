@@ -36,11 +36,31 @@ TOKEN_KEYWORDS: dict[str, list[str]] = {
 CACHE_TTL = 300   # seconds (5 minutes)
 MAX_ITEMS_PER_FEED = 20
 
+
 # ---------------------------------------------------------------------------
-# In-memory cache
+# Thread-safe in-memory cache
 # ---------------------------------------------------------------------------
 
-_cache: dict = {"articles": [], "fetched_at": 0.0}
+class _NewsCache:
+    """Simple TTL cache for news articles."""
+
+    def __init__(self, ttl: int = CACHE_TTL) -> None:
+        self._ttl = ttl
+        self._articles: list[dict] = []
+        self._fetched_at: float = 0.0
+
+    def is_fresh(self) -> bool:
+        return bool(self._articles) and (time.time() - self._fetched_at) < self._ttl
+
+    def get(self) -> list[dict]:
+        return self._articles
+
+    def set(self, articles: list[dict]) -> None:
+        self._articles = articles
+        self._fetched_at = time.time()
+
+
+_cache = _NewsCache()
 
 # ---------------------------------------------------------------------------
 # Demo fallback articles (used when all feeds are unreachable)
@@ -144,8 +164,9 @@ def _parse_date(entry) -> str:
         if hasattr(entry, "published_parsed") and entry.published_parsed:
             dt = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
             return dt.isoformat()
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Could not parse date for entry '%s': %s",
+                     getattr(entry, "title", "<unknown>"), exc)
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -166,18 +187,14 @@ def fetch_news(token_filter: Optional[str] = None) -> list[dict]:
         Optional uppercase token symbol (``"BTC"``, ``"ETH"``, ``"HYPE"``).
         When supplied only articles tagged with that token are returned.
     """
-    global _cache  # noqa: PLW0603
-
-    now = time.time()
-
-    if now - _cache["fetched_at"] < CACHE_TTL and _cache["articles"]:
-        articles = _cache["articles"]
-    else:
+    if not _cache.is_fresh():
         articles = _fetch_from_feeds()
         if not articles:
             logger.info("All RSS feeds failed – using demo news articles")
             articles = DEMO_ARTICLES.copy()
-        _cache = {"articles": articles, "fetched_at": now}
+        _cache.set(articles)
+
+    articles = _cache.get()
 
     if token_filter:
         tf = token_filter.upper()
