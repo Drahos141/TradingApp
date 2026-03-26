@@ -4,19 +4,34 @@
     <!-- ===== Top Bar ===== -->
     <header class="sticky top-0 z-30 bg-card/90 backdrop-blur border-b border-border px-4 py-3 flex flex-wrap items-center gap-3">
       <!-- Logo -->
-      <div class="flex items-center gap-2 mr-4">
+      <div class="flex items-center gap-2 mr-2">
         <span class="text-2xl">📈</span>
         <span class="font-bold text-lg tracking-tight text-white">TradingApp</span>
       </div>
 
-      <!-- Asset tabs -->
-      <div class="flex gap-1 flex-wrap">
+      <!-- Main navigation tabs -->
+      <nav class="flex gap-1">
+        <button
+          v-for="tab in mainTabs"
+          :key="tab.id"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
+          :class="activeTab === tab.id
+            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+            : 'bg-surface text-gray-400 hover:bg-border hover:text-white'"
+          @click="activeTab = tab.id"
+        >
+          {{ tab.icon }} {{ tab.label }}
+        </button>
+      </nav>
+
+      <!-- Asset tabs (markets only) -->
+      <div v-if="activeTab === 'markets'" class="flex gap-1 flex-wrap">
         <button
           v-for="asset in store.assets"
           :key="asset.symbol"
           class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
           :class="store.selectedSymbol === asset.symbol
-            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+            ? 'bg-blue-600/80 text-white shadow-lg shadow-blue-500/20'
             : 'bg-surface text-gray-400 hover:bg-border hover:text-white'"
           @click="store.setSymbol(asset.symbol)"
         >
@@ -30,7 +45,7 @@
 
       <!-- Demo mode badge -->
       <div
-        v-if="store.demoMode"
+        v-if="store.demoMode && activeTab === 'markets'"
         class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-yellow-900/50 border border-yellow-700/50 text-yellow-400 text-xs font-semibold"
       >
         🎭 DEMO
@@ -58,16 +73,16 @@
         {{ lastUpdatedStr }}
       </span>
 
-      <!-- Refresh countdown -->
-      <div class="flex items-center gap-1 text-xs text-gray-500">
+      <!-- Refresh countdown (markets only) -->
+      <div v-if="activeTab === 'markets'" class="flex items-center gap-1 text-xs text-gray-500">
         <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="31.4 31.4" />
         </svg>
         <span>{{ countdown }}s</span>
       </div>
 
-      <!-- Add card button -->
-      <div class="relative" ref="addMenuRef">
+      <!-- Add card button (markets only) -->
+      <div v-if="activeTab === 'markets'" class="relative" ref="addMenuRef">
         <button
           class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors"
           @click="showAddMenu = !showAddMenu"
@@ -88,56 +103,65 @@
       </div>
     </header>
 
-    <!-- ===== Error Banner ===== -->
-    <div
-      v-if="store.error && !store.demoMode"
-      class="mx-4 mt-3 px-4 py-3 rounded-xl bg-red-900/40 border border-red-700/50 text-red-300 text-sm"
-    >
-      ⚠️ {{ store.error }}
-    </div>
-
-    <!-- ===== Loading overlay ===== -->
-    <div
-      v-if="store.loading && !store.dashboardData"
-      class="flex-1 flex items-center justify-center gap-3 text-gray-500"
-    >
-      <svg class="w-6 h-6 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="31.4 31.4" />
-      </svg>
-      <span>Loading market data…</span>
-    </div>
-
-    <!-- ===== Draggable Grid ===== -->
-    <main class="flex-1 p-4">
-      <draggable
-        v-model="cards"
-        handle=".drag-handle"
-        item-key="id"
-        class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 auto-rows-auto"
-        :animation="200"
-        ghost-class="opacity-30"
-        chosen-class="scale-105 shadow-2xl"
-      >
-        <template #item="{ element }">
-          <div class="min-h-56">
-            <component
-              :is="CARD_MAP[element.type]"
-              @remove="removeCard(element.id)"
-            />
-          </div>
-        </template>
-      </draggable>
-
-      <!-- Empty state -->
+    <!-- ===== Markets Tab ===== -->
+    <template v-if="activeTab === 'markets'">
+      <!-- Error Banner -->
       <div
-        v-if="!cards.length"
-        class="flex flex-col items-center justify-center py-24 text-gray-600"
+        v-if="store.error && !store.demoMode"
+        class="mx-4 mt-3 px-4 py-3 rounded-xl bg-red-900/40 border border-red-700/50 text-red-300 text-sm"
       >
-        <span class="text-5xl mb-4">🃏</span>
-        <p class="text-lg">No cards on the dashboard</p>
-        <p class="text-sm mt-1">Click <strong class="text-gray-400">+ Card</strong> to add one</p>
+        ⚠️ {{ store.error }}
       </div>
-    </main>
+
+      <!-- Loading overlay -->
+      <div
+        v-if="store.loading && !store.dashboardData"
+        class="flex-1 flex items-center justify-center gap-3 text-gray-500"
+      >
+        <svg class="w-6 h-6 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="31.4 31.4" />
+        </svg>
+        <span>Loading market data…</span>
+      </div>
+
+      <!-- Draggable Grid -->
+      <main class="flex-1 p-4">
+        <draggable
+          v-model="cards"
+          handle=".drag-handle"
+          item-key="id"
+          class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 auto-rows-auto"
+          :animation="200"
+          ghost-class="opacity-30"
+          chosen-class="scale-105 shadow-2xl"
+        >
+          <template #item="{ element }">
+            <div class="min-h-56">
+              <component
+                :is="CARD_MAP[element.type]"
+                @remove="removeCard(element.id)"
+              />
+            </div>
+          </template>
+        </draggable>
+
+        <!-- Empty state -->
+        <div
+          v-if="!cards.length"
+          class="flex flex-col items-center justify-center py-24 text-gray-600"
+        >
+          <span class="text-5xl mb-4">🃏</span>
+          <p class="text-lg">No cards on the dashboard</p>
+          <p class="text-sm mt-1">Click <strong class="text-gray-400">+ Card</strong> to add one</p>
+        </div>
+      </main>
+    </template>
+
+    <!-- ===== Trading Tab ===== -->
+    <SimulatedTrading v-else-if="activeTab === 'trading'" />
+
+    <!-- ===== News Tab ===== -->
+    <NewsTab v-else-if="activeTab === 'news'" />
 
   </div>
 </template>
@@ -151,6 +175,8 @@ import ChartCard       from './cards/ChartCard.vue'
 import IndicatorsCard  from './cards/IndicatorsCard.vue'
 import SignalsCard     from './cards/SignalsCard.vue'
 import PredictionsCard from './cards/PredictionsCard.vue'
+import SimulatedTrading from './SimulatedTrading.vue'
+import NewsTab          from './NewsTab.vue'
 
 const CARD_MAP = {
   price:       PriceCard,
@@ -168,7 +194,16 @@ const ALL_CARDS = [
   { type: 'predictions', label: 'ML Predictions',     icon: '🤖' },
 ]
 
+const mainTabs = [
+  { id: 'markets', label: 'Markets',  icon: '📊' },
+  { id: 'trading', label: 'Trading',  icon: '💼' },
+  { id: 'news',    label: 'News',     icon: '📰' },
+]
+
 const store = useMarketStore()
+
+// Active main tab
+const activeTab = ref('markets')
 
 // Initial card layout
 const cards = ref([

@@ -19,6 +19,7 @@ from data_fetcher import fetch_ohlcv, get_current_price, ASSET_MAP
 from indicators import calculate_indicators, indicator_signals
 from ml_predictions import predict_all_timeframes
 from demo_data import generate_ohlcv, generate_price_info
+from news_fetcher import fetch_news
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,12 +55,13 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 ASSETS = [
-    {"symbol": "BTC",  "name": "Bitcoin",       "category": "crypto",     "ticker": "BTC-USD"},
-    {"symbol": "ETH",  "name": "Ethereum",       "category": "crypto",     "ticker": "ETH-USD"},
-    {"symbol": "BNB",  "name": "BNB",            "category": "crypto",     "ticker": "BNB-USD"},
-    {"symbol": "SOL",  "name": "Solana",          "category": "crypto",     "ticker": "SOL-USD"},
-    {"symbol": "XAU",  "name": "Gold",            "category": "commodity",  "ticker": "GC=F"},
-    {"symbol": "CL",   "name": "Crude Oil (WTI)", "category": "commodity",  "ticker": "CL=F"},
+    {"symbol": "BTC",  "name": "Bitcoin",        "category": "crypto",     "ticker": "BTC-USD"},
+    {"symbol": "ETH",  "name": "Ethereum",        "category": "crypto",     "ticker": "ETH-USD"},
+    {"symbol": "BNB",  "name": "BNB",             "category": "crypto",     "ticker": "BNB-USD"},
+    {"symbol": "SOL",  "name": "Solana",           "category": "crypto",     "ticker": "SOL-USD"},
+    {"symbol": "HYPE", "name": "Hyperliquid HYPE", "category": "crypto",     "ticker": "HYPE-USD"},
+    {"symbol": "XAU",  "name": "Gold",             "category": "commodity",  "ticker": "GC=F"},
+    {"symbol": "CL",   "name": "Crude Oil (WTI)",  "category": "commodity",  "ticker": "CL=F"},
 ]
 
 # ---------------------------------------------------------------------------
@@ -85,6 +87,13 @@ def price(symbol: str):
         # always returns a usable response rather than a 404.
         info = generate_price_info(sym)
     return info
+
+
+@app.get("/api/news")
+def news(token: Optional[str] = Query(default=None, description="Filter by token: BTC, ETH, HYPE")):
+    """Fetch crypto news articles with optional token filter."""
+    articles = fetch_news(token)
+    return {"articles": articles}
 
 
 @app.get("/api/dashboard/{symbol}")
