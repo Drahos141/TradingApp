@@ -11,12 +11,13 @@ logger = logging.getLogger(__name__)
 
 # Map our asset symbols to Yahoo Finance tickers
 ASSET_MAP = {
-    "BTC": "BTC-USD",
-    "ETH": "ETH-USD",
-    "BNB": "BNB-USD",
-    "SOL": "SOL-USD",
-    "XAU": "GC=F",   # Gold futures
-    "CL":  "CL=F",   # WTI Crude Oil futures
+    "BTC":  "BTC-USD",
+    "ETH":  "ETH-USD",
+    "BNB":  "BNB-USD",
+    "SOL":  "SOL-USD",
+    "HYPE": "HYPE-USD",  # Hyperliquid HYPE token
+    "XAU":  "GC=F",   # Gold futures
+    "CL":   "CL=F",   # WTI Crude Oil futures
 }
 
 # Map our timeframe labels to yfinance interval / period combos
