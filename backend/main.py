@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from data_fetcher import fetch_ohlcv, get_current_price, ASSET_MAP
 from indicators import calculate_indicators, indicator_signals
 from ml_predictions import predict_all_timeframes
+from ai_predictions import predict_ai_tools
 from demo_data import generate_ohlcv, generate_price_info
 from news_fetcher import fetch_news
 
@@ -94,6 +95,30 @@ def news(token: Optional[str] = Query(default=None, description="Filter by token
     """Fetch crypto news articles with optional token filter."""
     articles = fetch_news(token)
     return {"articles": articles}
+
+
+@app.get("/api/ai_predictions/{symbol}")
+def ai_predictions(
+    symbol: str,
+    timeframe: str = Query(default="1h", description="Prediction timeframe: 5m | 1h | 4h | 24h"),
+):
+    """
+    Multi-AI-tool predictions for *symbol* at the given *timeframe*.
+
+    Returns an array of predictions from 8 different AI platforms
+    (Sharpe AI, Numerai Signals, FinRL-X, QuantConnect Alpha, Taapi.io,
+    Coinglass Intelligence, Alpha Vantage AI, Glassnode AI).
+    """
+    sym = symbol.upper()
+    if sym not in ASSET_MAP and sym not in [a["symbol"] for a in ASSETS]:
+        raise HTTPException(status_code=400, detail=f"Unknown symbol: {symbol}")
+
+    df = fetch_ohlcv(sym, timeframe)
+    if df is None:
+        df = generate_ohlcv(sym)
+
+    tools = predict_ai_tools(df, sym, timeframe)
+    return {"symbol": sym, "timeframe": timeframe, "tools": tools}
 
 
 @app.get("/api/dashboard/{symbol}")

@@ -1,6 +1,28 @@
 <template>
   <div class="flex-1 p-4 max-w-6xl mx-auto w-full">
 
+    <!-- ===== Portfolio Summary ===== -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div class="bg-card border border-border rounded-2xl px-4 py-3">
+        <p class="text-xs text-gray-500 mb-1">Open Positions</p>
+        <p class="text-2xl font-bold text-white">{{ store.openPositions.length }}</p>
+      </div>
+      <div class="bg-card border border-border rounded-2xl px-4 py-3">
+        <p class="text-xs text-gray-500 mb-1">Total Exposure</p>
+        <p class="text-2xl font-bold text-white">${{ totalExposure.toLocaleString() }}</p>
+      </div>
+      <div class="bg-card border border-border rounded-2xl px-4 py-3">
+        <p class="text-xs text-gray-500 mb-1">Unrealised PnL</p>
+        <p class="text-2xl font-bold" :class="totalPnL >= 0 ? 'text-green-400' : 'text-red-400'">
+          {{ totalPnL >= 0 ? '+' : '' }}${{ totalPnL.toFixed(2) }}
+        </p>
+      </div>
+      <div class="bg-card border border-border rounded-2xl px-4 py-3">
+        <p class="text-xs text-gray-500 mb-1">Closed Trades</p>
+        <p class="text-2xl font-bold text-white">{{ store.closedPositions.length }}</p>
+      </div>
+    </div>
+
     <!-- ===== Open New Position ===== -->
     <div class="bg-card border border-border rounded-2xl p-6 mb-6">
       <h2 class="text-lg font-bold text-white mb-5 flex items-center gap-2">
@@ -25,6 +47,15 @@
         <!-- Amount (USDC) -->
         <div>
           <label class="block text-xs text-gray-400 mb-1.5 font-medium">Amount (USDC)</label>
+          <div class="flex gap-1.5 flex-wrap mb-1.5">
+            <button
+              v-for="preset in [50, 100, 500, 1000]"
+              :key="preset"
+              type="button"
+              class="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface border border-border hover:border-blue-500 hover:text-blue-400 text-gray-500 transition-colors"
+              @click="form.amount = preset"
+            >${{ preset }}</button>
+          </div>
           <input
             v-model.number="form.amount"
             type="number"
@@ -46,15 +77,26 @@
               @click="useCurrentPrice"
             >use current</button>
           </label>
-          <input
-            v-model.number="form.entryPrice"
-            type="number"
-            min="0.000001"
-            step="any"
-            required
-            placeholder="Auto-filled"
-            class="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
-          />
+          <div class="relative">
+            <input
+              v-model.number="form.entryPrice"
+              type="number"
+              min="0.000001"
+              step="any"
+              required
+              placeholder="Auto-filled"
+              class="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition-colors"
+            />
+            <div
+              v-if="fetchingPrice"
+              class="absolute right-3 top-1/2 -translate-y-1/2"
+            >
+              <svg class="w-3 h-3 animate-spin text-blue-400" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"
+                  stroke-linecap="round" stroke-dasharray="31.4 31.4" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         <!-- Direction + Submit -->
@@ -99,7 +141,13 @@
             {{ store.openPositions.length }}
           </span>
         </h2>
-        <span class="text-xs text-gray-500">Prices update every 10s</span>
+        <span class="text-xs text-gray-500 flex items-center gap-1">
+          <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-dasharray="31.4 31.4" />
+          </svg>
+          Prices update every 10s
+        </span>
       </div>
 
       <div v-if="!store.openPositions.length" class="text-center py-10 text-gray-600">
@@ -128,7 +176,7 @@
               class="border-b border-border/50 hover:bg-surface/40 transition-colors"
             >
               <td class="py-3 pr-4 font-semibold text-white">
-                🪙 {{ pos.symbol }}
+                {{ categoryIcon(pos.symbol) }} {{ pos.symbol }}
               </td>
               <td class="py-3 pr-4">
                 <span
@@ -143,7 +191,8 @@
               <td class="py-3 pr-4 text-right text-gray-300">${{ pos.amount.toLocaleString() }}</td>
               <td class="py-3 pr-4 text-right text-gray-300">{{ formatPrice(pos.entryPrice) }}</td>
               <td class="py-3 pr-4 text-right text-white font-medium">
-                {{ formatPrice(getLivePrice(pos.symbol)) }}
+                <span v-if="getLivePrice(pos.symbol) != null">{{ formatPrice(getLivePrice(pos.symbol)) }}</span>
+                <span v-else class="text-gray-600">—</span>
               </td>
               <td class="py-3 pr-4 text-right font-semibold" :class="getPnL(pos).pnlUSD >= 0 ? 'text-green-400' : 'text-red-400'">
                 {{ getPnL(pos).pnlUSD >= 0 ? '+' : '' }}${{ getPnL(pos).pnlUSD.toFixed(2) }}
@@ -170,6 +219,9 @@
       <div class="flex items-center justify-between mb-5">
         <h2 class="text-lg font-bold text-white flex items-center gap-2">
           🗂️ Closed Positions
+          <span class="px-2 py-0.5 rounded-full bg-gray-700/50 text-gray-400 text-xs font-semibold">
+            {{ store.closedPositions.length }}
+          </span>
         </h2>
         <button
           class="text-xs text-gray-500 hover:text-red-400 transition-colors"
@@ -241,27 +293,31 @@ const form = ref({
   entryPrice: null,
 })
 const formError = ref('')
+const fetchingPrice = ref(false)
 
-function getCurrentPriceForSymbol(symbol) {
-  return store.livePrices[symbol] ?? store.price?.price ?? null
+function categoryIcon(symbol) {
+  const asset = store.assets.find(a => a.symbol === symbol)
+  return asset?.category === 'crypto' ? '🪙' : '🏭'
 }
 
 function getLivePrice(symbol) {
   return store.livePrices[symbol] ?? null
 }
 
-function onSymbolChange() {
-  const p = getCurrentPriceForSymbol(form.value.symbol)
+async function onSymbolChange() {
+  fetchingPrice.value = true
+  await store.fetchLivePrice(form.value.symbol)
+  fetchingPrice.value = false
+  const p = getLivePrice(form.value.symbol)
   if (p) form.value.entryPrice = p
 }
 
-function useCurrentPrice() {
-  const p = getCurrentPriceForSymbol(form.value.symbol)
-  if (p) {
-    form.value.entryPrice = p
-  } else {
-    store.fetchLivePrice(form.value.symbol)
-  }
+async function useCurrentPrice() {
+  fetchingPrice.value = true
+  await store.fetchLivePrice(form.value.symbol)
+  fetchingPrice.value = false
+  const p = getLivePrice(form.value.symbol)
+  if (p) form.value.entryPrice = p
 }
 
 function submitPosition() {
@@ -280,7 +336,6 @@ function submitPosition() {
     amount:     form.value.amount,
     entryPrice: form.value.entryPrice,
   })
-  // Also store the entry price as a known live price via store action
   store.updateLivePrice(form.value.symbol, form.value.entryPrice)
   form.value.amount = 100
 }
@@ -307,6 +362,15 @@ function getClosedPnL(pos) {
   return { pnlUSD, pnlPct }
 }
 
+// ---- Portfolio summary ----
+const totalExposure = computed(() =>
+  store.openPositions.reduce((sum, pos) => sum + pos.amount, 0)
+)
+
+const totalPnL = computed(() =>
+  store.openPositions.reduce((sum, pos) => sum + getPnL(pos).pnlUSD, 0)
+)
+
 // ---- Helpers ----
 function formatPrice(price) {
   if (price == null) return '—'
@@ -323,17 +387,16 @@ const recentClosed = computed(() =>
 let priceTimer = null
 
 onMounted(async () => {
-  // Pre-fill entry price for the default symbol
+  fetchingPrice.value = true
   await store.fetchLivePrice(form.value.symbol)
-  const p = getCurrentPriceForSymbol(form.value.symbol)
+  fetchingPrice.value = false
+  const p = getLivePrice(form.value.symbol)
   if (p) form.value.entryPrice = p
 
-  // Fetch prices for all open positions
   await store.fetchLivePricesForOpenPositions()
 
   priceTimer = setInterval(async () => {
     await store.fetchLivePricesForOpenPositions()
-    // Also keep the form symbol price fresh
     await store.fetchLivePrice(form.value.symbol)
   }, 10000)
 })
