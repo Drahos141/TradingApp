@@ -1,8 +1,9 @@
 <template>
-  <div class="min-h-screen bg-surface flex flex-col">
+  <div class="min-h-screen bg-surface flex flex-col relative">
+    <ParticleBackground />
 
     <!-- ===== Top Bar ===== -->
-    <header class="sticky top-0 z-30 bg-card/90 backdrop-blur border-b border-border px-4 py-3 flex flex-wrap items-center gap-3">
+    <header class="sticky top-0 z-30 bg-card/90 backdrop-blur border-b border-border px-4 py-3 flex flex-wrap items-center gap-3" style="position: relative; z-index: 30;">
       <!-- Logo -->
       <div class="flex items-center gap-2 mr-2">
         <span class="text-2xl">📈</span>
@@ -91,14 +92,22 @@
         <!-- Dropdown -->
         <div
           v-if="showAddMenu"
-          class="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-2xl p-2 z-50 min-w-40 space-y-1"
+          class="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-2xl p-2 z-50 min-w-56 space-y-1"
         >
+          <p class="text-[10px] text-gray-600 uppercase tracking-widest px-2 pb-1">Choose card type</p>
           <button
-            v-for="card in availableCards"
+            v-for="card in ALL_CARDS"
             :key="card.type"
-            class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-border transition-colors text-gray-300"
+            class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-border transition-colors text-gray-300 flex items-center gap-2"
             @click="addCard(card.type); showAddMenu = false"
-          >{{ card.icon }} {{ card.label }}</button>
+          >
+            <span class="text-base leading-none">{{ card.icon }}</span>
+            <span class="flex-1">{{ card.label }}</span>
+            <span
+              v-if="cardCount(card.type) > 0"
+              class="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600/30 text-blue-400 font-semibold"
+            >×{{ cardCount(card.type) }}</span>
+          </button>
         </div>
       </div>
     </header>
@@ -108,7 +117,7 @@
       <!-- Error Banner -->
       <div
         v-if="store.error && !store.demoMode"
-        class="mx-4 mt-3 px-4 py-3 rounded-xl bg-red-900/40 border border-red-700/50 text-red-300 text-sm"
+        class="mx-4 mt-3 px-4 py-3 rounded-xl bg-red-900/40 border border-red-700/50 text-red-300 text-sm relative z-10"
       >
         ⚠️ {{ store.error }}
       </div>
@@ -116,7 +125,7 @@
       <!-- Loading overlay -->
       <div
         v-if="store.loading && !store.dashboardData"
-        class="flex-1 flex items-center justify-center gap-3 text-gray-500"
+        class="flex-1 flex items-center justify-center gap-3 text-gray-500 relative z-10"
       >
         <svg class="w-6 h-6 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="31.4 31.4" />
@@ -125,7 +134,7 @@
       </div>
 
       <!-- Draggable Grid -->
-      <main class="flex-1 p-4">
+      <main class="flex-1 p-4 relative z-10">
         <draggable
           v-model="cards"
           handle=".drag-handle"
@@ -158,10 +167,14 @@
     </template>
 
     <!-- ===== Trading Tab ===== -->
-    <SimulatedTrading v-else-if="activeTab === 'trading'" />
+    <div v-else-if="activeTab === 'trading'" class="relative z-10 flex-1">
+      <SimulatedTrading />
+    </div>
 
     <!-- ===== News Tab ===== -->
-    <NewsTab v-else-if="activeTab === 'news'" />
+    <div v-else-if="activeTab === 'news'" class="relative z-10 flex-1">
+      <NewsTab />
+    </div>
 
   </div>
 </template>
@@ -170,28 +183,32 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import draggable from 'vuedraggable'
 import { useMarketStore } from '@/store/market'
-import PriceCard       from './cards/PriceCard.vue'
-import ChartCard       from './cards/ChartCard.vue'
-import IndicatorsCard  from './cards/IndicatorsCard.vue'
-import SignalsCard     from './cards/SignalsCard.vue'
-import PredictionsCard from './cards/PredictionsCard.vue'
-import SimulatedTrading from './SimulatedTrading.vue'
-import NewsTab          from './NewsTab.vue'
+import PriceCard          from './cards/PriceCard.vue'
+import ChartCard          from './cards/ChartCard.vue'
+import IndicatorsCard     from './cards/IndicatorsCard.vue'
+import SignalsCard        from './cards/SignalsCard.vue'
+import PredictionsCard    from './cards/PredictionsCard.vue'
+import AIPredictionsCard  from './cards/AIPredictionsCard.vue'
+import SimulatedTrading   from './SimulatedTrading.vue'
+import NewsTab            from './NewsTab.vue'
+import ParticleBackground from './ParticleBackground.vue'
 
 const CARD_MAP = {
-  price:       PriceCard,
-  chart:       ChartCard,
-  indicators:  IndicatorsCard,
-  signals:     SignalsCard,
-  predictions: PredictionsCard,
+  price:          PriceCard,
+  chart:          ChartCard,
+  indicators:     IndicatorsCard,
+  signals:        SignalsCard,
+  predictions:    PredictionsCard,
+  ai_predictions: AIPredictionsCard,
 }
 
 const ALL_CARDS = [
-  { type: 'price',       label: 'Price Overview',    icon: '💰' },
-  { type: 'chart',       label: 'Price Chart',       icon: '📈' },
-  { type: 'indicators',  label: 'Indicators',         icon: '📐' },
-  { type: 'signals',     label: 'Buy/Sell Signals',   icon: '🚦' },
-  { type: 'predictions', label: 'ML Predictions',     icon: '🤖' },
+  { type: 'price',          label: 'Price Overview',       icon: '💰' },
+  { type: 'chart',          label: 'Price Chart',          icon: '📈' },
+  { type: 'indicators',     label: 'Indicators',           icon: '📐' },
+  { type: 'signals',        label: 'Buy/Sell Signals',     icon: '🚦' },
+  { type: 'predictions',    label: 'ML Predictions',       icon: '🤖' },
+  { type: 'ai_predictions', label: 'MORE AI Predictions',  icon: '🧬' },
 ]
 
 const mainTabs = [
@@ -215,6 +232,11 @@ const cards = ref([
 ])
 
 let nextId = 10
+
+// Count how many of each type are on the dashboard
+function cardCount(type) {
+  return cards.value.filter((c) => c.type === type).length
+}
 
 const availableCards = computed(() =>
   ALL_CARDS.filter((c) => !cards.value.some((card) => card.type === c.type))
