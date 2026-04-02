@@ -21,6 +21,7 @@ from ml_predictions import predict_all_timeframes
 from ai_predictions import predict_ai_tools
 from demo_data import generate_ohlcv, generate_price_info
 from news_fetcher import fetch_news
+from backtester import run_backtest, STRATEGY_META
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -200,9 +201,56 @@ def dashboard(
     }
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+@app.get("/api/backtest/strategies")
+def list_strategies():
+    """Return available backtesting strategies and their parameters."""
+    return {"strategies": STRATEGY_META}
+
+
+@app.post("/api/backtest/{symbol}")
+def backtest(
+    symbol: str,
+    strategy: str = Query(default="ma_crossover"),
+    timeframe: str = Query(default="1h"),
+    params: str = Query(default="{}"),
+):
+    """
+    Run a backtest for *symbol* using the chosen *strategy*.
+
+    Query parameters:
+      - strategy: strategy id (see /api/backtest/strategies)
+      - timeframe: OHLCV timeframe
+      - params: JSON-encoded strategy parameters (optional overrides)
+    """
+    import json as _json
+    sym = symbol.upper()
+    if sym not in ASSET_MAP and sym not in [a["symbol"] for a in ASSETS]:
+        raise HTTPException(status_code=400, detail=f"Unknown symbol: {symbol}")
+
+    try:
+        extra_params = _json.loads(params) if params else {}
+    except Exception:
+        extra_params = {}
+
+    df = fetch_ohlcv(sym, timeframe)
+    if df is None:
+        df = generate_ohlcv(sym)
+
+    try:
+        result = run_backtest(strategy, df, extra_params)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "symbol": sym,
+        "timeframe": timeframe,
+        "strategy": strategy,
+        "params": extra_params,
+        "result": result,
+    }
+
+
+
 
 def _summarize_signals(signals: dict) -> dict:
     """Compute majority buy/sell/neutral from individual indicator signals."""

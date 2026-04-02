@@ -3,7 +3,7 @@
     <template #header-actions>
       <select
         v-model="localTf"
-        class="bg-surface border border-border rounded px-2 py-0.5 text-xs text-gray-300 focus:outline-none"
+        class="cyber-input text-xs py-1 px-2"
         @change="store.setTimeframe(localTf)"
       >
         <option v-for="tf in TIMEFRAMES" :key="tf" :value="tf">{{ tf }}</option>
@@ -40,17 +40,17 @@ function initChart() {
   if (!chartContainer.value) return
   chart = createChart(chartContainer.value, {
     layout: {
-      background: { color: '#1e2a3b' },
-      textColor: '#94a3b8',
+      background: { color: '#0d1b2a' },
+      textColor: '#22d3ee',
     },
     grid: {
-      vertLines: { color: '#263548' },
-      horzLines: { color: '#263548' },
+      vertLines: { color: 'rgba(0,229,255,0.05)' },
+      horzLines: { color: 'rgba(0,229,255,0.05)' },
     },
     crosshair: { mode: 1 },
-    rightPriceScale: { borderColor: '#263548' },
+    rightPriceScale: { borderColor: 'rgba(0,229,255,0.1)' },
     timeScale: {
-      borderColor: '#263548',
+      borderColor: 'rgba(0,229,255,0.1)',
       timeVisible: true,
       secondsVisible: false,
     },

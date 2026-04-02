@@ -21,6 +21,16 @@ from ml_predictions import (
 from demo_data import generate_ohlcv, generate_price_info
 from data_fetcher import get_ticker, ASSET_MAP
 from main import app, _summarize_signals
+from backtester import (
+    strategy_ma_crossover,
+    strategy_rsi_mean_reversion,
+    strategy_bollinger_bands,
+    strategy_macd,
+    strategy_breakout,
+    strategy_momentum,
+    run_backtest,
+    STRATEGY_META,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -331,4 +341,199 @@ class TestAPIEndpoints:
         assert r.status_code == 200
         # TestClient already decoded JSON; re-encode to verify all values are serializable
         assert json.dumps(r.json()) is not None
+
+
+# ---------------------------------------------------------------------------
+# Backtesting strategy tests
+# ---------------------------------------------------------------------------
+
+class TestBacktestStrategies:
+    """Unit tests for every built-in backtesting strategy."""
+
+    def _make_trending_df(self, n: int = 300, trend: float = 0.5) -> pd.DataFrame:
+        """Trending series (upward by default)."""
+        rng = np.random.default_rng(99)
+        close = 100.0 + np.cumsum(rng.normal(trend, 1.5, n))
+        close = np.clip(close, 1.0, None)
+        high   = close + rng.uniform(0.1, 1.5, n)
+        low    = close - rng.uniform(0.1, 1.5, n)
+        open_  = close + rng.normal(0, 0.3, n)
+        volume = rng.uniform(1e6, 1e7, n)
+        idx = pd.date_range("2023-01-01", periods=n, freq="1h")
+        return pd.DataFrame(
+            {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
+            index=idx,
+        )
+
+    def _assert_valid_result(self, result: dict):
+        assert "total_return_pct" in result
+        assert "max_drawdown_pct" in result
+        assert "num_trades" in result
+        assert "win_rate_pct" in result
+        assert "sharpe_ratio" in result
+        assert "profit_factor" in result
+        assert "avg_trade_pct" in result
+        assert isinstance(result["trades"], list)
+        assert result["max_drawdown_pct"] >= 0
+        assert 0 <= result["win_rate_pct"] <= 100
+
+    def test_ma_crossover_result_structure(self):
+        df = self._make_trending_df()
+        result = strategy_ma_crossover(df, fast=5, slow=20)
+        self._assert_valid_result(result)
+
+    def test_ma_crossover_direction_long_only(self):
+        df = self._make_trending_df()
+        result = strategy_ma_crossover(df, fast=5, slow=20, direction="long")
+        for trade in result["trades"]:
+            assert trade["side"] == "LONG"
+
+    def test_ma_crossover_direction_short_only(self):
+        df = self._make_trending_df()
+        result = strategy_ma_crossover(df, fast=5, slow=20, direction="short")
+        for trade in result["trades"]:
+            assert trade["side"] == "SHORT"
+
+    def test_rsi_mean_reversion_result_structure(self):
+        df = self._make_trending_df()
+        result = strategy_rsi_mean_reversion(df, period=14, oversold=30, overbought=70)
+        self._assert_valid_result(result)
+
+    def test_rsi_mean_reversion_all_trades_long(self):
+        df = self._make_trending_df()
+        result = strategy_rsi_mean_reversion(df)
+        for trade in result["trades"]:
+            assert trade["side"] == "LONG"
+
+    def test_bollinger_bands_result_structure(self):
+        df = self._make_trending_df()
+        result = strategy_bollinger_bands(df, period=20, std_dev=2.0)
+        self._assert_valid_result(result)
+
+    def test_bollinger_bands_all_trades_long(self):
+        df = self._make_trending_df()
+        result = strategy_bollinger_bands(df)
+        for trade in result["trades"]:
+            assert trade["side"] == "LONG"
+
+    def test_macd_result_structure(self):
+        df = self._make_trending_df()
+        result = strategy_macd(df, fast=12, slow=26, signal=9)
+        self._assert_valid_result(result)
+
+    def test_breakout_result_structure(self):
+        df = self._make_trending_df()
+        result = strategy_breakout(df, lookback=20, stop_loss_pct=2.0, take_profit_pct=4.0)
+        self._assert_valid_result(result)
+
+    def test_breakout_exit_reason_present(self):
+        df = self._make_trending_df()
+        result = strategy_breakout(df)
+        for trade in result["trades"]:
+            if "exit_reason" in trade:
+                assert trade["exit_reason"] in ("SL", "TP")
+
+    def test_momentum_result_structure(self):
+        df = self._make_trending_df()
+        result = strategy_momentum(df, roc_period=10, threshold=1.5, hold_bars=5)
+        self._assert_valid_result(result)
+
+    def test_run_backtest_dispatcher(self):
+        df = self._make_trending_df()
+        for strategy_id in ["ma_crossover", "rsi_mean_reversion", "bollinger_bands",
+                             "macd", "breakout", "momentum"]:
+            result = run_backtest(strategy_id, df, {})
+            self._assert_valid_result(result)
+
+    def test_run_backtest_unknown_strategy_raises(self):
+        df = self._make_trending_df()
+        with pytest.raises(ValueError):
+            run_backtest("nonexistent_strategy", df, {})
+
+    def test_strategy_meta_structure(self):
+        assert len(STRATEGY_META) >= 5
+        for meta in STRATEGY_META:
+            assert "id" in meta
+            assert "name" in meta
+            assert "description" in meta
+            assert "params" in meta
+            for param in meta["params"]:
+                assert "name" in param
+                assert "label" in param
+                assert "type" in param
+                assert "default" in param
+
+    def test_no_trade_returns_empty_result(self):
+        # Very flat data – MA crossover should produce few/no trades
+        n = 50
+        close = np.full(n, 100.0)
+        idx = pd.date_range("2024-01-01", periods=n, freq="1h")
+        df = pd.DataFrame({
+            "open": close, "high": close + 0.001,
+            "low": close - 0.001, "close": close, "volume": np.ones(n) * 1e6,
+        }, index=idx)
+        result = strategy_ma_crossover(df)
+        assert result["num_trades"] == 0
+        assert result["total_return_pct"] == 0.0
+
+    def test_equity_curve_length(self):
+        df = self._make_trending_df()
+        result = strategy_ma_crossover(df)
+        if result["num_trades"] > 0:
+            assert len(result["equity_curve"]) == result["num_trades"] + 1
+
+
+# ---------------------------------------------------------------------------
+# Backtesting API endpoint tests
+# ---------------------------------------------------------------------------
+
+class TestBacktestAPI:
+    def test_list_strategies(self, client):
+        r = client.get("/api/backtest/strategies")
+        assert r.status_code == 200
+        data = r.json()
+        assert "strategies" in data
+        assert len(data["strategies"]) >= 5
+
+    def test_backtest_default_strategy(self, client):
+        r = client.post("/api/backtest/BTC?strategy=ma_crossover&timeframe=1h")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["symbol"] == "BTC"
+        assert data["strategy"] == "ma_crossover"
+        assert "result" in data
+        result = data["result"]
+        assert "total_return_pct" in result
+        assert "num_trades" in result
+        assert "win_rate_pct" in result
+        assert "sharpe_ratio" in result
+
+    def test_backtest_all_strategies(self, client):
+        strategies = ["ma_crossover", "rsi_mean_reversion", "bollinger_bands",
+                      "macd", "breakout", "momentum"]
+        for strat in strategies:
+            r = client.post(f"/api/backtest/BTC?strategy={strat}&timeframe=1h")
+            assert r.status_code == 200, f"Backtest failed for strategy {strat}: {r.text}"
+            assert "result" in r.json()
+
+    def test_backtest_with_custom_params(self, client):
+        import json
+        params = json.dumps({"fast": 5, "slow": 15})
+        r = client.post(f"/api/backtest/ETH?strategy=ma_crossover&timeframe=1h&params={params}")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["params"]["fast"] == 5
+
+    def test_backtest_unknown_symbol_returns_400(self, client):
+        r = client.post("/api/backtest/FAKECOIN?strategy=ma_crossover")
+        assert r.status_code == 400
+
+    def test_backtest_unknown_strategy_returns_400(self, client):
+        r = client.post("/api/backtest/BTC?strategy=nonexistent_strategy")
+        assert r.status_code == 400
+
+    def test_backtest_all_symbols(self, client):
+        for sym in ["BTC", "ETH", "SOL", "XAU", "CL"]:
+            r = client.post(f"/api/backtest/{sym}?strategy=rsi_mean_reversion&timeframe=1h")
+            assert r.status_code == 200, f"Backtest failed for {sym}"
 
