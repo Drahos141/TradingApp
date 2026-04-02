@@ -1,13 +1,13 @@
 """
 Backtesting engine for TradingApp.
 
-Supports 5 built-in strategies, each returning a standardised result dict:
+Supports 6 built-in strategies, each returning a standardised result dict:
   - total_return_pct   float
   - max_drawdown_pct   float
   - num_trades         int
   - win_rate_pct       float
   - sharpe_ratio       float
-  - trades             list[dict]  (open/close/pnl per trade)
+  - trades             list[dict]  (up to *max_trades* open/close/pnl entries)
 """
 from __future__ import annotations
 
@@ -48,8 +48,13 @@ def _compute_max_drawdown(equity_curve: list[float]) -> float:
     return round(max_dd, 2)
 
 
-def _build_result(trades: list[dict], initial_capital: float = 10_000.0) -> dict:
-    """Build standardised backtest result from raw trades list."""
+def _build_result(trades: list[dict], initial_capital: float = 10_000.0, max_trades: int = 50) -> dict:
+    """Build standardised backtest result from raw trades list.
+
+    *max_trades* controls how many of the most recent trades are included in the
+    returned ``trades`` list (default 50).  All trades are still used for metric
+    calculations — only the returned slice is capped.
+    """
     if not trades:
         return {
             "total_return_pct": 0.0,
@@ -97,7 +102,7 @@ def _build_result(trades: list[dict], initial_capital: float = 10_000.0) -> dict
         "profit_factor": profit_factor,
         "avg_trade_pct": avg_trade,
         "equity_curve": [round(e, 2) for e in equity_curve],
-        "trades": trades[-50:],  # return last 50 for brevity
+        "trades": trades[-max_trades:],  # return last N for brevity; all trades used in metric calculations
     }
 
 
